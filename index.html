@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="マネーポケット">
+<title>マネーポケット</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <h1 id="header-title">カレンダー</h1>
+    <div style="display:flex;align-items:center;gap:2px">
+      <button class="header-icon-btn" onclick="openSettings()" title="設定"><i class="ti ti-settings"></i></button>
+      <div style="text-align:right;margin-left:4px">
+        <span class="header-ver" id="header-ver"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('calendar')"><i class="ti ti-calendar" aria-hidden="true"></i>カレンダー</div>
+    <div class="tab" onclick="switchTab('stats')"><i class="ti ti-chart-bar" aria-hidden="true"></i>集計</div>
+    <div class="tab" onclick="switchTab('budget')"><i class="ti ti-wallet" aria-hidden="true"></i>予算</div>
+  </div>
+
+  <!-- ══ CALENDAR SCREEN ══ -->
+  <div id="screen-calendar" class="screen active">
+    <div class="cal-wrap">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px 0">
+        <div class="view-switcher">
+          <button class="view-btn active" id="vbtn-month" onclick="setView('month')">月</button>
+          <button class="view-btn" id="vbtn-day" onclick="setView('day')">日</button>
+        </div>
+        <button class="add-event-btn" onclick="openAddModal()"><i class="ti ti-plus" aria-hidden="true"></i>記録を追加</button>
+      </div>
+      <div class="cal-nav">
+        <button class="cal-nav-btn" onclick="navBack()"><i class="ti ti-chevron-left"></i></button>
+        <span class="cal-nav-label" id="cal-nav-label"></span>
+        <button class="cal-nav-btn" onclick="navFwd()"><i class="ti ti-chevron-right"></i></button>
+      </div>
+
+      <!-- Monthly view -->
+      <div id="view-month" style="display:flex;flex-direction:column;flex:1;overflow-y:auto">
+        <div class="cal-head" style="padding:0 16px">
+          <div class="cal-dow">日</div><div class="cal-dow">月</div><div class="cal-dow">火</div>
+          <div class="cal-dow">水</div><div class="cal-dow">木</div><div class="cal-dow">金</div><div class="cal-dow">土</div>
+        </div>
+        <div class="cal-body-month" id="cal-body-month" style="margin:0 16px"></div>
+        <div class="today-panel" id="month-summary-panel"></div>
+      </div>
+
+      <!-- Daily view -->
+      <div id="view-day" style="display:none;flex-direction:column;flex:1;overflow:hidden">
+        <div class="day-head"><div class="day-head-label" id="day-head-label"></div></div>
+        <div class="day-list" id="day-list"></div>
+        <div style="padding:10px 16px">
+          <button class="add-event-btn" style="width:100%;justify-content:center" onclick="openAddModal(dayCursorStr())"><i class="ti ti-plus" aria-hidden="true"></i>記録を追加</button>
+        </div>
+        <div class="day-summary-panel" id="day-summary-panel"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ STATS SCREEN ══ -->
+  <div id="screen-stats" class="screen">
+    <div class="stats-screen">
+      <div class="cal-nav" style="padding:10px 0 6px">
+        <button class="cal-nav-btn" onclick="statsNavBack()"><i class="ti ti-chevron-left"></i></button>
+        <span class="cal-nav-label" id="stats-nav-label"></span>
+        <button class="cal-nav-btn" onclick="statsNavFwd()"><i class="ti ti-chevron-right"></i></button>
+      </div>
+      <div class="view-switcher" style="margin:0 0 12px">
+        <button class="view-btn active" id="stats-btn-expense" onclick="setStatsType('expense')" style="width:auto;border-radius:var(--r);padding:6px 14px">支出</button>
+        <button class="view-btn" id="stats-btn-income" onclick="setStatsType('income')" style="width:auto;border-radius:var(--r);padding:6px 14px">収入</button>
+      </div>
+      <div class="stats-total-card" id="stats-total-card"></div>
+      <div id="stats-bars"></div>
+    </div>
+  </div>
+
+  <!-- ══ BUDGET SCREEN ══ -->
+  <div id="screen-budget" class="screen">
+    <div class="budget-screen">
+      <div class="budget-month-label" id="budget-month-label"></div>
+      <div id="budget-list"></div>
+    </div>
+  </div>
+
+</div><!-- .app -->
+
+<!-- ══ ADD/EDIT TRANSACTION MODAL ══ -->
+<div class="modal-overlay" id="txn-modal">
+  <div class="modal-sheet">
+    <div class="modal-sheet-inner">
+      <div class="modal-title" id="txn-modal-title">記録を追加</div>
+      <div class="form-row">
+        <label class="form-label">日付</label>
+        <input class="form-input" type="date" id="txn-date">
+      </div>
+      <div class="form-row">
+        <label class="form-label">メモ</label>
+        <input class="form-input" type="text" id="txn-memo" placeholder="○○店 など">
+      </div>
+      <div class="form-row">
+        <label class="form-label">金額</label>
+        <input class="form-input" type="number" id="txn-amount" inputmode="numeric" placeholder="0">
+      </div>
+      <div class="form-row">
+        <label class="form-label">カテゴリ</label>
+        <select class="form-select" id="txn-category" onchange="onCategorySelectChange()"></select>
+      </div>
+      <div class="form-row" id="new-cat-row" style="display:none">
+        <label class="form-label">新しいカテゴリ</label>
+        <input class="form-input" id="new-cat-name" placeholder="カテゴリ名" style="margin-bottom:8px">
+        <div class="toggle-row">
+          <label class="form-label" style="margin-bottom:0">収入カテゴリにする</label>
+          <div class="toggle-switch" id="new-cat-toggle" onclick="toggleNewCatType()"><div class="toggle-thumb"></div></div>
+        </div>
+        <div class="modal-actions" style="margin-top:10px">
+          <button class="btn-cancel" onclick="cancelNewCat()">キャンセル</button>
+          <button class="btn-save" onclick="confirmNewCat()">追加する</button>
+        </div>
+      </div>
+      <div class="modal-actions" id="txn-modal-actions"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SETTINGS MODAL ══ -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal-sheet">
+    <div class="modal-sheet-inner">
+      <div class="modal-title">設定</div>
+      <div class="settings-section">
+        <div class="settings-section-title">カテゴリ</div>
+        <button class="settings-btn" onclick="openCategoryManager()"><i class="ti ti-tags"></i>カテゴリ管理</button>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title">データ管理</div>
+        <button class="settings-btn" onclick="exportData()"><i class="ti ti-download"></i>データをエクスポート（JSON）</button>
+        <button class="settings-btn" onclick="document.getElementById('import-file').click()"><i class="ti ti-upload"></i>データをインポート（JSON）</button>
+        <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(this)">
+      </div>
+      <div class="modal-actions" style="margin-top:4px">
+        <button class="btn-cancel" onclick="closeSettings()">閉じる</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CATEGORY MANAGER MODAL ══ -->
+<div class="modal-overlay" id="category-modal">
+  <div class="modal-sheet">
+    <div class="modal-sheet-inner">
+      <div class="modal-title">カテゴリ管理</div>
+      <div class="settings-section">
+        <div class="settings-section-title">支出カテゴリ</div>
+        <div id="cat-list-expense"></div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title">収入カテゴリ</div>
+        <div id="cat-list-income"></div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title">新しいカテゴリを追加</div>
+        <input class="form-input" id="cat-add-name" placeholder="カテゴリ名" style="margin-bottom:8px">
+        <div class="toggle-row" style="margin-bottom:10px">
+          <label class="form-label" style="margin-bottom:0">収入カテゴリにする</label>
+          <div class="toggle-switch" id="cat-add-toggle" onclick="toggleCatAddType()"><div class="toggle-thumb"></div></div>
+        </div>
+        <button class="settings-btn" style="text-align:center;justify-content:center" onclick="addCategoryFromManager()"><i class="ti ti-plus"></i>追加する</button>
+      </div>
+      <div class="modal-actions" style="margin-top:4px">
+        <button class="btn-cancel" onclick="closeCategoryManager()">閉じる</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
