@@ -1,7 +1,7 @@
 /* ══════════════════════════
    DATA
 ══════════════════════════ */
-const VERSION = 'ver.1.1.0';
+const VERSION = 'ver.1.1.1';
 const TODAY = new Date();
 TODAY.setHours(0,0,0,0);
 
@@ -837,6 +837,21 @@ function confirmImport() {
   if (count > 0) alert(count + '件を取り込みました');
   else alert('取り込めるデータがありませんでした');
 }
+
+/* ══════════════════════════
+   入力欄オートスクロール
+   入力欄にフォーカスしたとき、ソフトキーボードで隠れない
+   見やすい位置（中央寄り）へスクロールする
+══════════════════════════ */
+document.addEventListener('focusin', (e) => {
+  const t = e.target;
+  if (!t || !t.matches || !t.matches('input, textarea, select')) return;
+  // キーボードが出てビューポートが変化するのを待ってからスクロール
+  setTimeout(() => {
+    try { t.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    catch(_) { try { t.scrollIntoView(); } catch(_) {} }
+  }, 300);
+});
 
 /* ══════════════════════════
    INIT
