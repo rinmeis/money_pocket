@@ -156,6 +156,25 @@
   </div>
 </div>
 
+<!-- ══ WARIKAN IMPORT MODAL ══ -->
+<div class="modal-overlay" id="import-modal">
+  <div class="modal-sheet">
+    <div class="modal-sheet-inner">
+      <div class="modal-title">割り勘から取り込み</div>
+      <div class="import-sub" id="import-sub"></div>
+      <div class="form-row" id="import-bulk-row" style="display:none">
+        <label class="form-label">すべてに適用</label>
+        <select class="form-select" id="import-bulk-category" onchange="applyBulkImportCategory()"></select>
+      </div>
+      <div id="import-list"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="cancelImport()">キャンセル</button>
+        <button class="btn-save" onclick="confirmImport()">取り込む</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ══ CATEGORY MANAGER MODAL ══ -->
 <div class="modal-overlay" id="category-modal">
   <div class="modal-sheet">

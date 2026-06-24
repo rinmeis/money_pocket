@@ -1,7 +1,7 @@
 /* ══════════════════════════
    DATA
 ══════════════════════════ */
-const VERSION = 'ver.1.0.0';
+const VERSION = 'ver.1.1.0';
 const TODAY = new Date();
 TODAY.setHours(0,0,0,0);
 
@@ -689,7 +689,158 @@ function importData(input) {
 }
 
 /* ══════════════════════════
+   割り勘(warikan)インポート
+══════════════════════════ */
+let importPendingItems = []; // [{date, amount, type, memo, category}]
+
+function b64urlDecode(s) {
+  s = s.replace(/-/g,'+').replace(/_/g,'/');
+  while (s.length % 4) s += '=';
+  return decodeURIComponent(escape(atob(s)));
+}
+
+function isValidDateStr(s) {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = parseDateStr(s);
+  return !isNaN(d.getTime());
+}
+
+function checkWarikanImport() {
+  const raw = new URLSearchParams(location.search).get('import');
+  if (!raw) return;
+
+  let payload;
+  try {
+    const json = b64urlDecode(raw);
+    payload = JSON.parse(json);
+  } catch(e) {
+    clearImportParam();
+    return;
+  }
+
+  if (!payload || payload.v !== 1 || payload.source !== 'warikan' || !Array.isArray(payload.items)) {
+    clearImportParam();
+    return;
+  }
+
+  const validItems = payload.items.filter(it =>
+    it && typeof it.amount === 'number' && it.amount > 0 &&
+    isValidDateStr(it.date) &&
+    it.type === 'expense'
+  ).map(it => ({
+    date: it.date,
+    amount: Math.round(it.amount),
+    type: 'expense',
+    memo: typeof it.memo === 'string' ? it.memo : ''
+  }));
+
+  if (!validItems.length) {
+    alert('取り込めるデータがありませんでした');
+    clearImportParam();
+    return;
+  }
+
+  const defaultCat = categories.find(c => c.type === 'expense');
+  importPendingItems = validItems.map(it => ({ ...it, category: defaultCat ? defaultCat.name : '' }));
+  openImportModal(typeof payload.group === 'string' ? payload.group : '');
+}
+
+function clearImportParam() {
+  const url = new URL(location.href);
+  url.searchParams.delete('import');
+  history.replaceState(null, '', url.toString());
+}
+
+function expenseCategoryOptions(selectedName) {
+  return categories.filter(c => c.type === 'expense').map(c =>
+    `<option value="${escHtml(c.name)}"${c.name===selectedName?' selected':''}>${escHtml(c.name)}</option>`
+  ).join('');
+}
+
+function openImportModal(groupName) {
+  document.getElementById('import-sub').textContent =
+    (groupName ? '（' + groupName + '）' : '') + ' から ' + importPendingItems.length + '件';
+
+  const bulkRow = document.getElementById('import-bulk-row');
+  const bulkSel = document.getElementById('import-bulk-category');
+  if (categories.some(c => c.type === 'expense')) {
+    bulkSel.innerHTML = `<option value="">（選択してください）</option>` + expenseCategoryOptions(null);
+    bulkRow.style.display = 'block';
+  } else {
+    bulkRow.style.display = 'none';
+  }
+
+  renderImportList();
+  lockScroll();
+  document.getElementById('import-modal').classList.add('open');
+}
+
+function renderImportList() {
+  const listEl = document.getElementById('import-list');
+  if (!importPendingItems.length) {
+    listEl.innerHTML = `<div class="import-empty">取り込めるデータがありませんでした</div>`;
+    return;
+  }
+  listEl.innerHTML = importPendingItems.map((it, i) => `
+    <div class="import-row">
+      <div class="import-row-top">
+        <span class="import-row-date">${escHtml(it.date)}</span>
+        <span class="import-row-memo">${escHtml(it.memo)}</span>
+        <span class="import-row-amt expense">-¥${yen(it.amount)}</span>
+      </div>
+      <select class="form-select" onchange="setImportItemCategory(${i}, this.value)">
+        ${expenseCategoryOptions(it.category)}
+      </select>
+    </div>`).join('');
+}
+
+function setImportItemCategory(idx, name) {
+  if (!importPendingItems[idx]) return;
+  importPendingItems[idx].category = name;
+}
+
+function applyBulkImportCategory() {
+  const val = document.getElementById('import-bulk-category').value;
+  if (!val) return;
+  importPendingItems.forEach(it => { it.category = val; });
+  renderImportList();
+}
+
+function cancelImport() {
+  document.getElementById('import-modal').classList.remove('open');
+  unlockScroll();
+  importPendingItems = [];
+  clearImportParam();
+}
+
+function confirmImport() {
+  if (!importPendingItems.length) { cancelImport(); return; }
+  let count = 0;
+  importPendingItems.forEach((it, i) => {
+    if (!it.category) return;
+    transactions.push({
+      id: 't' + Date.now() + Math.random().toString(36).slice(2,7) + i,
+      date: it.date,
+      amount: Math.round(it.amount),
+      type: 'expense',
+      category: it.category,
+      memo: it.memo
+    });
+    count++;
+  });
+  persist();
+  renderCurrentView();
+  document.getElementById('import-modal').classList.remove('open');
+  unlockScroll();
+  importPendingItems = [];
+  clearImportParam();
+  if (count > 0) alert(count + '件を取り込みました');
+  else alert('取り込めるデータがありませんでした');
+}
+
+/* ══════════════════════════
    INIT
 ══════════════════════════ */
 document.getElementById('header-ver').textContent = VERSION;
 renderMonth();
+checkWarikanImport();

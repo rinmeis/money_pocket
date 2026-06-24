@@ -176,6 +176,16 @@ input,select,textarea{
 .bar-fill.income{background:var(--blue)}
 .stats-empty{text-align:center;color:var(--text3);font-size:13px;padding:32px 0}
 
+/* ══ WARIKAN IMPORT ══ */
+.import-sub{font-size:12px;color:var(--text2);margin-bottom:14px;margin-top:-8px}
+.import-row{background:var(--bg2);border-radius:var(--r);padding:10px 12px;margin-bottom:8px}
+.import-row-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px}
+.import-row-date{font-size:12px;color:var(--text2);white-space:nowrap}
+.import-row-memo{font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;margin:0 8px}
+.import-row-amt{font-size:14px;font-weight:500;white-space:nowrap}
+.import-row-amt.expense{color:var(--red)}
+.import-empty{text-align:center;color:var(--text3);font-size:13px;padding:20px 0}
+
 /* ══ BUDGET ══ */
 .budget-screen{padding:14px 16px 20px;flex:1;overflow-y:auto}
 .budget-month-label{font-size:14px;font-weight:500;margin-bottom:14px}
