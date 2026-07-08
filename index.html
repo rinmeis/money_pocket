@@ -223,15 +223,43 @@
   <div class="modal-sheet">
     <div class="modal-sheet-inner">
       <div class="modal-title">レシートから取り込み</div>
+
+      <div class="receipt-mode-tabs">
+        <button class="receipt-mode-tab active" id="receipt-mode-items" onclick="setReceiptMode('items')">商品ごと</button>
+        <button class="receipt-mode-tab" id="receipt-mode-store" onclick="setReceiptMode('store')">店舗合計</button>
+      </div>
+
       <div class="form-row">
         <label class="form-label">日付</label>
         <input class="form-input" type="date" id="receipt-date">
       </div>
-      <div class="form-row" id="receipt-bulk-row" style="display:none">
-        <label class="form-label">すべてに適用</label>
-        <select class="form-select" id="receipt-bulk-category" onchange="applyBulkReceiptCategory()"></select>
+
+      <div id="receipt-items-section">
+        <div class="form-row" id="receipt-bulk-row" style="display:none">
+          <label class="form-label">すべてに適用</label>
+          <select class="form-select" id="receipt-bulk-category" onchange="applyBulkReceiptCategory()"></select>
+        </div>
+        <div id="receipt-list"></div>
       </div>
-      <div id="receipt-list"></div>
+
+      <div id="receipt-store-section" style="display:none">
+        <div class="form-row">
+          <label class="form-label">店舗名（メモ）</label>
+          <input class="form-input" type="text" id="receipt-store-name" placeholder="例：〇〇スーパー">
+        </div>
+        <div class="form-row">
+          <label class="form-label">合計金額</label>
+          <div class="receipt-store-amt-wrap">
+            <span class="yen-prefix">¥</span>
+            <input class="form-input" type="number" inputmode="numeric" id="receipt-store-amount" placeholder="0">
+          </div>
+        </div>
+        <div class="form-row">
+          <label class="form-label">カテゴリ</label>
+          <select class="form-select" id="receipt-store-category"></select>
+        </div>
+      </div>
+
       <div class="modal-actions">
         <button class="btn-cancel" onclick="cancelReceiptImport()">キャンセル</button>
         <button class="btn-save" onclick="confirmReceiptImport()">取り込む</button>

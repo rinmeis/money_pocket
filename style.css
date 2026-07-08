@@ -215,6 +215,13 @@ input,select,textarea{
 .receipt-row-mid .yen-prefix{font-size:13px;color:var(--text2)}
 .receipt-row-mid .receipt-price-input{flex:1;padding:7px 10px;font-size:14px;color:var(--red);font-weight:500}
 .receipt-empty{text-align:center;color:var(--text3);font-size:13px;padding:20px 0}
+/* レシート取込モード切替 */
+.receipt-mode-tabs{display:flex;gap:6px;background:var(--bg2);border-radius:var(--r);padding:4px;margin-bottom:14px}
+.receipt-mode-tab{flex:1;padding:8px 4px;border:none;background:none;border-radius:calc(var(--r) - 3px);font-size:13px;font-family:inherit;color:var(--text2);cursor:pointer}
+.receipt-mode-tab.active{background:var(--bg);color:var(--text);font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.receipt-store-amt-wrap{display:flex;align-items:center;gap:6px}
+.receipt-store-amt-wrap .yen-prefix{font-size:14px;color:var(--text2)}
+.receipt-store-amt-wrap .receipt-price-input,#receipt-store-amount{flex:1;color:var(--red);font-weight:500}
 
 /* ══ LOADING OVERLAY ══ */
 .loading-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:none;align-items:center;justify-content:center}

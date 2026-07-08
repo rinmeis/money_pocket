@@ -1,7 +1,7 @@
 /* ══════════════════════════
    DATA
 ══════════════════════════ */
-const VERSION = 'ver.1.2.0';
+const VERSION = 'ver.1.3.0';
 const TODAY = new Date();
 TODAY.setHours(0,0,0,0);
 
@@ -873,6 +873,9 @@ function deleteGeminiKey() {
    標準fetchでREST APIを直接呼び出す（追加SDKなし）。
 ══════════════════════════ */
 let receiptPendingItems = []; // [{name, price, category}]
+let receiptStoreName = '';    // 店舗合計モードのメモ（店舗名）
+let receiptStoreTotal = 0;    // 店舗合計モードの合計金額
+let receiptMode = 'items';    // 'items'（商品ごと）| 'store'（店舗合計）
 
 function openReceiptCapture() {
   const key = getGeminiKey();
@@ -934,7 +937,7 @@ async function analyzeReceiptImage(base64) {
   const body = {
     contents: [{ parts: [
       { inline_data: { mime_type: 'image/jpeg', data: base64 } },
-      { text: 'このレシート画像から、購入した各商品の『商品名』と『金額(円,整数)』、およびレシートの日付を読み取ってください。金額は実際に支払う価格。合計・小計・お預り・お釣り・ポイント・値引き見出しなどの行は商品に含めないでください。日付が読み取れなければnull。' }
+      { text: 'このレシート画像から次を読み取ってJSONで返してください。(1)購入した各商品の『商品名』と『金額(円,整数)』の一覧。合計・小計・お預り・お釣り・ポイント・値引き見出しなどの行は商品に含めない。(2)店舗名(store)。読み取れなければnull。(3)支払合計金額(total,円,整数)。税込の実際に支払った総額。読み取れなければnull。(4)レシートの日付(date,YYYY-MM-DD)。読み取れなければnull。' }
     ]}],
     generationConfig: {
       responseMimeType: 'application/json',
@@ -942,6 +945,8 @@ async function analyzeReceiptImage(base64) {
         type: 'OBJECT',
         properties: {
           date: { type: 'STRING', nullable: true },
+          store: { type: 'STRING', nullable: true },
+          total: { type: 'NUMBER', nullable: true },
           items: {
             type: 'ARRAY',
             items: {
@@ -1002,14 +1007,24 @@ async function analyzeReceiptImage(base64) {
     .filter(it => it && typeof it.price === 'number' && it.price > 0)
     .map(it => ({ name: (it.name != null ? String(it.name) : ''), price: Math.round(it.price) }));
 
-  if (!validItems.length) {
+  // 店舗名・合計。合計が読めなければ商品の合算をフォールバックに使う
+  const itemsSum = validItems.reduce((s, it) => s + it.price, 0);
+  const total = (typeof parsed.total === 'number' && parsed.total > 0) ? Math.round(parsed.total)
+              : (itemsSum > 0 ? itemsSum : 0);
+  receiptStoreName = (parsed.store != null) ? String(parsed.store) : '';
+
+  // 商品も合計も読めなければ中断
+  if (!validItems.length && total <= 0) {
     alert('商品を読み取れませんでした。写真を撮り直すか手入力してください');
     return;
   }
 
+  receiptStoreTotal = total;
   const dateStr = isValidDateStr(parsed.date) ? parsed.date : fmt(TODAY);
   const defaultCat = categories.find(c => c.type === 'expense');
   receiptPendingItems = validItems.map(it => ({ ...it, category: defaultCat ? defaultCat.name : '' }));
+  // 商品が読めていれば「商品ごと」、無ければ「店舗合計」を初期モードに
+  receiptMode = validItems.length ? 'items' : 'store';
   openReceiptModal(dateStr);
 }
 
@@ -1024,10 +1039,27 @@ function openReceiptModal(dateStr) {
   } else {
     bulkRow.style.display = 'none';
   }
-
   renderReceiptList();
+
+  // 店舗合計モードの初期値
+  document.getElementById('receipt-store-name').value = receiptStoreName;
+  document.getElementById('receipt-store-amount').value = receiptStoreTotal || '';
+  const defaultCat = categories.find(c => c.type === 'expense');
+  document.getElementById('receipt-store-category').innerHTML =
+    expenseCategoryOptions(defaultCat ? defaultCat.name : null);
+
+  setReceiptMode(receiptMode);
   lockScroll();
   document.getElementById('receipt-modal').classList.add('open');
+}
+
+// 「商品ごと」「店舗合計」の表示切替
+function setReceiptMode(mode) {
+  receiptMode = (mode === 'store') ? 'store' : 'items';
+  document.getElementById('receipt-mode-items').classList.toggle('active', receiptMode === 'items');
+  document.getElementById('receipt-mode-store').classList.toggle('active', receiptMode === 'store');
+  document.getElementById('receipt-items-section').style.display = receiptMode === 'items' ? 'block' : 'none';
+  document.getElementById('receipt-store-section').style.display = receiptMode === 'store' ? 'block' : 'none';
 }
 
 function renderReceiptList() {
@@ -1075,15 +1107,32 @@ function applyBulkReceiptCategory() {
   renderReceiptList();
 }
 function cancelReceiptImport() {
-  document.getElementById('receipt-modal').classList.remove('open');
-  unlockScroll();
-  receiptPendingItems = [];
+  closeReceiptModal();
 }
 function confirmReceiptImport() {
   const date = document.getElementById('receipt-date').value;
   if (!date) { alert('日付を入力してください'); return; }
-  if (!receiptPendingItems.length) { cancelReceiptImport(); return; }
 
+  if (receiptMode === 'store') {
+    // 店舗合計モード：1件だけ記録
+    const amount = Math.round(Number(document.getElementById('receipt-store-amount').value));
+    if (!amount || amount <= 0 || isNaN(amount)) { alert('合計金額を正しく入力してください'); return; }
+    const category = document.getElementById('receipt-store-category').value;
+    if (!category) { alert('カテゴリを選択してください'); return; }
+    const memo = document.getElementById('receipt-store-name').value.trim();
+    transactions.push({
+      id: 't' + Date.now() + Math.random().toString(36).slice(2,7),
+      date, amount, type: 'expense', category, memo
+    });
+    persist();
+    renderCurrentView();
+    closeReceiptModal();
+    alert('1件を取り込みました');
+    return;
+  }
+
+  // 商品ごとモード
+  if (!receiptPendingItems.length) { cancelReceiptImport(); return; }
   let count = 0;
   receiptPendingItems.forEach((it, i) => {
     if (!it.category) return;
@@ -1101,11 +1150,17 @@ function confirmReceiptImport() {
   });
   persist();
   renderCurrentView();
+  closeReceiptModal();
+  if (count > 0) alert(count + '件を取り込みました');
+  else alert('取り込めるデータがありませんでした');
+}
+
+function closeReceiptModal() {
   document.getElementById('receipt-modal').classList.remove('open');
   unlockScroll();
   receiptPendingItems = [];
-  if (count > 0) alert(count + '件を取り込みました');
-  else alert('取り込めるデータがありませんでした');
+  receiptStoreName = '';
+  receiptStoreTotal = 0;
 }
 
 /* ══════════════════════════
