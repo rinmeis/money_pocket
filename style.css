@@ -201,3 +201,22 @@ input,select,textarea{
 .budget-status{font-size:12px;color:var(--text2)}
 .budget-status.over{color:var(--red);font-weight:500}
 .budget-status.unset{color:var(--text3)}
+
+/* ══ GEMINI RECEIPT SETTINGS ══ */
+.gemini-key-status{font-size:12px;color:var(--text2);margin-bottom:8px}
+.gemini-key-note{font-size:11px;color:var(--text3);margin-top:2px;line-height:1.4}
+
+/* ══ RECEIPT IMPORT MODAL ══ */
+.receipt-row{background:var(--bg2);border-radius:var(--r);padding:10px 12px;margin-bottom:8px}
+.receipt-row-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.receipt-row-top .receipt-name-input{flex:1;padding:7px 10px;font-size:14px}
+.receipt-row-del{background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0 2px;line-height:1;flex-shrink:0}
+.receipt-row-mid{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.receipt-row-mid .yen-prefix{font-size:13px;color:var(--text2)}
+.receipt-row-mid .receipt-price-input{flex:1;padding:7px 10px;font-size:14px;color:var(--red);font-weight:500}
+.receipt-empty{text-align:center;color:var(--text3);font-size:13px;padding:20px 0}
+
+/* ══ LOADING OVERLAY ══ */
+.loading-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:none;align-items:center;justify-content:center}
+.loading-overlay.open{display:flex}
+.loading-box{background:var(--bg);color:var(--text);border-radius:var(--rl);padding:20px 28px;font-size:14px;font-weight:500;box-shadow:0 4px 24px rgba(0,0,0,.2)}

@@ -39,8 +39,12 @@
           <button class="view-btn active" id="vbtn-month" onclick="setView('month')">月</button>
           <button class="view-btn" id="vbtn-day" onclick="setView('day')">日</button>
         </div>
-        <button class="add-event-btn" onclick="openAddModal()"><i class="ti ti-plus" aria-hidden="true"></i>記録を追加</button>
+        <div style="display:flex;gap:6px">
+          <button class="add-event-btn" onclick="openReceiptCapture()"><i class="ti ti-camera" aria-hidden="true"></i>レシート読み取り</button>
+          <button class="add-event-btn" onclick="openAddModal()"><i class="ti ti-plus" aria-hidden="true"></i>記録を追加</button>
+        </div>
       </div>
+      <input type="file" id="receipt-file" accept="image/*" capture="environment" style="display:none" onchange="handleReceiptFile(this)">
       <div class="cal-nav">
         <button class="cal-nav-btn" onclick="navBack()"><i class="ti ti-chevron-left"></i></button>
         <span class="cal-nav-label" id="cal-nav-label"></span>
@@ -149,6 +153,16 @@
         <button class="settings-btn" onclick="document.getElementById('import-file').click()"><i class="ti ti-upload"></i>データをインポート（JSON）</button>
         <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(this)">
       </div>
+      <div class="settings-section">
+        <div class="settings-section-title">レシート読み取り（Gemini）</div>
+        <div class="gemini-key-status" id="gemini-key-status"></div>
+        <input class="form-input" type="password" id="gemini-key-input" autocomplete="off" placeholder="Gemini APIキーを入力" style="margin-bottom:8px">
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <button class="btn-cancel" style="flex:1" onclick="deleteGeminiKey()">削除</button>
+          <button class="btn-save" style="flex:1" onclick="saveGeminiKey()">保存</button>
+        </div>
+        <div class="gemini-key-note">キーはこの端末内にのみ保存され、外部やGitHubには送られません</div>
+      </div>
       <div class="modal-actions" style="margin-top:4px">
         <button class="btn-cancel" onclick="closeSettings()">閉じる</button>
       </div>
@@ -202,6 +216,33 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- ══ RECEIPT IMPORT MODAL ══ -->
+<div class="modal-overlay" id="receipt-modal">
+  <div class="modal-sheet">
+    <div class="modal-sheet-inner">
+      <div class="modal-title">レシートから取り込み</div>
+      <div class="form-row">
+        <label class="form-label">日付</label>
+        <input class="form-input" type="date" id="receipt-date">
+      </div>
+      <div class="form-row" id="receipt-bulk-row" style="display:none">
+        <label class="form-label">すべてに適用</label>
+        <select class="form-select" id="receipt-bulk-category" onchange="applyBulkReceiptCategory()"></select>
+      </div>
+      <div id="receipt-list"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="cancelReceiptImport()">キャンセル</button>
+        <button class="btn-save" onclick="confirmReceiptImport()">取り込む</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ RECEIPT LOADING OVERLAY ══ -->
+<div class="loading-overlay" id="receipt-loading-overlay">
+  <div class="loading-box">レシートを読み取り中…</div>
 </div>
 
 <script src="app.js"></script>

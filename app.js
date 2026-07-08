@@ -1,7 +1,7 @@
 /* ══════════════════════════
    DATA
 ══════════════════════════ */
-const VERSION = 'ver.1.1.1';
+const VERSION = 'ver.1.2.0';
 const TODAY = new Date();
 TODAY.setHours(0,0,0,0);
 
@@ -585,6 +585,7 @@ function setBudget(catId, value) {
    設定モーダル
 ══════════════════════════ */
 function openSettings() {
+  renderGeminiKeyStatus();
   lockScroll();
   document.getElementById('settings-modal').classList.add('open');
 }
@@ -834,6 +835,275 @@ function confirmImport() {
   unlockScroll();
   importPendingItems = [];
   clearImportParam();
+  if (count > 0) alert(count + '件を取り込みました');
+  else alert('取り込めるデータがありませんでした');
+}
+
+/* ══════════════════════════
+   Gemini APIキー管理（設定）
+   キーは localStorage の mp_gemini_key にのみ保存。
+   コードにはハードコードしない。
+══════════════════════════ */
+function getGeminiKey() {
+  try { return localStorage.getItem('mp_gemini_key') || ''; } catch(e) { return ''; }
+}
+function renderGeminiKeyStatus() {
+  const el = document.getElementById('gemini-key-status');
+  if (!el) return;
+  const key = getGeminiKey();
+  el.textContent = key ? ('設定済み（****' + key.slice(-4) + '）') : '未設定';
+}
+function saveGeminiKey() {
+  const val = document.getElementById('gemini-key-input').value.trim();
+  try {
+    if (val) localStorage.setItem('mp_gemini_key', val);
+    else localStorage.removeItem('mp_gemini_key');
+  } catch(e) {}
+  document.getElementById('gemini-key-input').value = '';
+  renderGeminiKeyStatus();
+}
+function deleteGeminiKey() {
+  try { localStorage.removeItem('mp_gemini_key'); } catch(e) {}
+  document.getElementById('gemini-key-input').value = '';
+  renderGeminiKeyStatus();
+}
+
+/* ══════════════════════════
+   レシート読み取り（Gemini）
+   標準fetchでREST APIを直接呼び出す（追加SDKなし）。
+══════════════════════════ */
+let receiptPendingItems = []; // [{name, price, category}]
+
+function openReceiptCapture() {
+  const key = getGeminiKey();
+  if (!key) {
+    alert('先に設定でGeminiキーを登録してください');
+    openSettings();
+    return;
+  }
+  document.getElementById('receipt-file').click();
+}
+
+function handleReceiptFile(input) {
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxSide = 1600;
+      let w = img.width, h = img.height;
+      if (w > maxSide || h > maxSide) {
+        if (w >= h) { h = Math.round(h * maxSide / w); w = maxSide; }
+        else { w = Math.round(w * maxSide / h); h = maxSide; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      const base64 = dataUrl.split(',')[1] || '';
+      analyzeReceiptImage(base64);
+    };
+    img.onerror = () => { alert('画像を読み込めませんでした'); };
+    img.src = e.target.result;
+  };
+  reader.onerror = () => { alert('画像を読み込めませんでした'); };
+  reader.readAsDataURL(file);
+}
+
+function showReceiptLoading() {
+  document.getElementById('receipt-loading-overlay').classList.add('open');
+}
+function hideReceiptLoading() {
+  document.getElementById('receipt-loading-overlay').classList.remove('open');
+}
+
+async function analyzeReceiptImage(base64) {
+  const key = getGeminiKey();
+  if (!key) {
+    alert('先に設定でGeminiキーを登録してください');
+    openSettings();
+    return;
+  }
+
+  showReceiptLoading();
+
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=' + encodeURIComponent(key);
+  const body = {
+    contents: [{ parts: [
+      { inline_data: { mime_type: 'image/jpeg', data: base64 } },
+      { text: 'このレシート画像から、購入した各商品の『商品名』と『金額(円,整数)』、およびレシートの日付を読み取ってください。金額は実際に支払う価格。合計・小計・お預り・お釣り・ポイント・値引き見出しなどの行は商品に含めないでください。日付が読み取れなければnull。' }
+    ]}],
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'OBJECT',
+        properties: {
+          date: { type: 'STRING', nullable: true },
+          items: {
+            type: 'ARRAY',
+            items: {
+              type: 'OBJECT',
+              properties: { name: { type: 'STRING' }, price: { type: 'NUMBER' } },
+              required: ['name','price']
+            }
+          }
+        },
+        required: ['items']
+      }
+    }
+  };
+
+  let res;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+  } catch(err) {
+    console.error('レシート読み取り: 通信エラー', err);
+    hideReceiptLoading();
+    alert('通信に失敗しました。電波状況をご確認ください');
+    return;
+  }
+
+  if (!res.ok) {
+    console.error('レシート読み取り: APIエラー status=' + res.status);
+    hideReceiptLoading();
+    if (res.status === 400 || res.status === 401 || res.status === 403) {
+      alert('Geminiキーが正しくないか、権限がありません。設定を確認してください');
+    } else if (res.status === 429) {
+      alert('利用上限に達しました。しばらく待つか、明日お試しください');
+    } else {
+      alert('読み取り結果を解釈できませんでした。撮り直してください');
+    }
+    return;
+  }
+
+  let parsed;
+  try {
+    const data = await res.json();
+    const text = data.candidates[0].content.parts[0].text;
+    parsed = JSON.parse(text);
+  } catch(err) {
+    console.error('レシート読み取り: 結果パースエラー', err);
+    hideReceiptLoading();
+    alert('読み取り結果を解釈できませんでした。撮り直してください');
+    return;
+  }
+
+  hideReceiptLoading();
+
+  const rawItems = Array.isArray(parsed.items) ? parsed.items : [];
+  const validItems = rawItems
+    .filter(it => it && typeof it.price === 'number' && it.price > 0)
+    .map(it => ({ name: (it.name != null ? String(it.name) : ''), price: Math.round(it.price) }));
+
+  if (!validItems.length) {
+    alert('商品を読み取れませんでした。写真を撮り直すか手入力してください');
+    return;
+  }
+
+  const dateStr = isValidDateStr(parsed.date) ? parsed.date : fmt(TODAY);
+  const defaultCat = categories.find(c => c.type === 'expense');
+  receiptPendingItems = validItems.map(it => ({ ...it, category: defaultCat ? defaultCat.name : '' }));
+  openReceiptModal(dateStr);
+}
+
+function openReceiptModal(dateStr) {
+  document.getElementById('receipt-date').value = dateStr;
+
+  const bulkRow = document.getElementById('receipt-bulk-row');
+  const bulkSel = document.getElementById('receipt-bulk-category');
+  if (categories.some(c => c.type === 'expense')) {
+    bulkSel.innerHTML = `<option value="">（選択してください）</option>` + expenseCategoryOptions(null);
+    bulkRow.style.display = 'block';
+  } else {
+    bulkRow.style.display = 'none';
+  }
+
+  renderReceiptList();
+  lockScroll();
+  document.getElementById('receipt-modal').classList.add('open');
+}
+
+function renderReceiptList() {
+  const listEl = document.getElementById('receipt-list');
+  if (!receiptPendingItems.length) {
+    listEl.innerHTML = `<div class="receipt-empty">項目がありません</div>`;
+    return;
+  }
+  listEl.innerHTML = receiptPendingItems.map((it, i) => `
+    <div class="receipt-row">
+      <div class="receipt-row-top">
+        <input class="form-input receipt-name-input" type="text" value="${escHtml(it.name)}" oninput="setReceiptItemName(${i}, this.value)">
+        <button class="receipt-row-del" onclick="deleteReceiptItem(${i})" title="削除"><i class="ti ti-x"></i></button>
+      </div>
+      <div class="receipt-row-mid">
+        <span class="yen-prefix">¥</span>
+        <input class="form-input receipt-price-input" type="number" inputmode="numeric" value="${it.price}" oninput="setReceiptItemPrice(${i}, this.value)">
+      </div>
+      <select class="form-select" onchange="setReceiptItemCategory(${i}, this.value)">
+        ${expenseCategoryOptions(it.category)}
+      </select>
+    </div>`).join('');
+}
+
+function setReceiptItemName(idx, val) {
+  if (!receiptPendingItems[idx]) return;
+  receiptPendingItems[idx].name = val;
+}
+function setReceiptItemPrice(idx, val) {
+  if (!receiptPendingItems[idx]) return;
+  receiptPendingItems[idx].price = Number(val);
+}
+function setReceiptItemCategory(idx, name) {
+  if (!receiptPendingItems[idx]) return;
+  receiptPendingItems[idx].category = name;
+}
+function deleteReceiptItem(idx) {
+  receiptPendingItems.splice(idx, 1);
+  renderReceiptList();
+}
+function applyBulkReceiptCategory() {
+  const val = document.getElementById('receipt-bulk-category').value;
+  if (!val) return;
+  receiptPendingItems.forEach(it => { it.category = val; });
+  renderReceiptList();
+}
+function cancelReceiptImport() {
+  document.getElementById('receipt-modal').classList.remove('open');
+  unlockScroll();
+  receiptPendingItems = [];
+}
+function confirmReceiptImport() {
+  const date = document.getElementById('receipt-date').value;
+  if (!date) { alert('日付を入力してください'); return; }
+  if (!receiptPendingItems.length) { cancelReceiptImport(); return; }
+
+  let count = 0;
+  receiptPendingItems.forEach((it, i) => {
+    if (!it.category) return;
+    const amount = Math.round(Number(it.price));
+    if (!amount || amount <= 0 || isNaN(amount)) return;
+    transactions.push({
+      id: 't' + Date.now() + Math.random().toString(36).slice(2,7) + i,
+      date,
+      amount,
+      type: 'expense',
+      category: it.category,
+      memo: it.name
+    });
+    count++;
+  });
+  persist();
+  renderCurrentView();
+  document.getElementById('receipt-modal').classList.remove('open');
+  unlockScroll();
+  receiptPendingItems = [];
   if (count > 0) alert(count + '件を取り込みました');
   else alert('取り込めるデータがありませんでした');
 }
